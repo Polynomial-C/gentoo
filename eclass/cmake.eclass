@@ -52,9 +52,9 @@ _CMAKE_ECLASS=1
 # @DEFAULT_UNSET
 # @DESCRIPTION:
 # Specify a makefile generator to be used by cmake.
-# At this point only "emake" and "ninja" are supported.
-# The default is set to "ninja".
-: ${CMAKE_MAKEFILE_GENERATOR:=ninja}
+# At this point only "emake", "eninja" and "ninja" are supported.
+# The default is set to "eninja".
+: ${CMAKE_MAKEFILE_GENERATOR:=eninja}
 
 # @ECLASS-VARIABLE: CMAKE_REMOVE_MODULES_LIST
 # @DESCRIPTION:
@@ -117,8 +117,8 @@ case ${CMAKE_MAKEFILE_GENERATOR} in
 	emake)
 		BDEPEND="sys-devel/make"
 		;;
-	ninja)
-		BDEPEND="dev-util/ninja"
+	eninja|ninja)
+		BDEPEND="|| ( dev-util/ninja dev-util/samurai )"
 		;;
 	*)
 		eerror "Unknown value for \${CMAKE_MAKEFILE_GENERATOR}"
@@ -335,13 +335,6 @@ cmake_src_prepare() {
 		die "FATAL: Unable to find CMakeLists.txt"
 	fi
 
-	# if ninja is enabled but not installed, the build could fail
-	# this could happen if ninja is manually enabled (eg. make.conf) but not installed
-	if [[ ${CMAKE_MAKEFILE_GENERATOR} == ninja ]] && ! has_version -b dev-util/ninja; then
-		eerror "CMAKE_MAKEFILE_GENERATOR is set to ninja, but ninja is not installed."
-		die "Please install dev-util/ninja or unset CMAKE_MAKEFILE_GENERATOR."
-	fi
-
 	local modules_list
 	if [[ $(declare -p CMAKE_REMOVE_MODULES_LIST) == "declare -a"* ]]; then
 		modules_list=( "${CMAKE_REMOVE_MODULES_LIST[@]}" )
@@ -534,7 +527,7 @@ cmake_src_configure() {
 
 	local generator_name
 	case ${CMAKE_MAKEFILE_GENERATOR} in
-		ninja) generator_name="Ninja" ;;
+		eninja|ninja) generator_name="Ninja" ;;
 		emake) generator_name="Unix Makefiles" ;;
 	esac
 
@@ -592,8 +585,9 @@ cmake_build() {
 				*) emake VERBOSE=1 "$@" ;;
 			esac
 			;;
-		ninja)
+		eninja|ninja)
 			[[ -e build.ninja ]] || die "build.ninja not found. Error during configure stage."
+			CMAKE_MAKEFILE_GENERATOR=eninja
 			eninja "$@"
 			;;
 	esac

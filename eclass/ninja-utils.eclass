@@ -1,4 +1,4 @@
-# Copyright 1999-2018 Gentoo Foundation
+# Copyright 1999-2021 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 # @ECLASS: ninja-utils.eclass
@@ -27,6 +27,15 @@ case ${EAPI:-0} in
 	*) die "EAPI=${EAPI} is not yet supported" ;;
 esac
 
+# @ECLASS-VARIABLE: NINJA
+# @PRE_INHERIT
+# @DEFAULT_UNSET
+# @DESCRIPTION:
+# Specify a compatible ninja implementation to be used by eninja.
+# At this point only "ninja" and "samu" are supported.
+# The default is set to "ninja".
+: ${NINJA:=ninja}
+
 # @ECLASS-VARIABLE: NINJAOPTS
 # @DEFAULT_UNSET
 # @DESCRIPTION:
@@ -35,6 +44,30 @@ esac
 # MAKEOPTS instead.
 
 inherit multiprocessing
+
+_ninja_to_use() {
+	case "${NINJA}" in
+		ninja)
+			local ninja=dev-util/${NINJA}
+		;;
+		samu)
+			local ninja=dev-util/samurai
+		;;
+		*)
+			eerror "Unknown value for \${NINJA}"
+			die "Value ${NINJA} is not supported"
+		;;
+	esac
+
+	# if ninja or samurai are enabled but not installed, the build could fail
+	# this could happen if they are manually enabled (eg. make.conf) but not installed
+	if ! has_version -b ${ninja}; then
+		eerror "Value ${NINJA} for \${NINJA} is not installed"
+		die "Please install ${ninja}"
+	fi
+
+	echo ${NINJA}
+}
 
 # @FUNCTION: eninja
 # @USAGE: [<args>...]
@@ -49,7 +82,7 @@ eninja() {
 	if [[ -z ${NINJAOPTS+set} ]]; then
 		NINJAOPTS="-j$(makeopts_jobs) -l$(makeopts_loadavg "${MAKEOPTS}" 0)"
 	fi
-	set -- ninja -v ${NINJAOPTS} "$@"
+	set -- "$(_ninja_to_use)" -v ${NINJAOPTS} "$@"
 	echo "$@" >&2
 	"$@" || die "${nonfatal_args[@]}" "${*} failed"
 }
